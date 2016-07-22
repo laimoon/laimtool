@@ -1,34 +1,73 @@
+"""Doc..."""
 import click
+
 from laimenv import LaimLaim
+from laimenv import STATUSES
+from laimenv import (
+    LaimEnvAlreadyExists,
+    LaimEnvDoesNotExist,
+    LaimEnvNotStopped)
+
+
 laim = LaimLaim()
 
 
 @click.group()
 def cli():
-    click.echo("Run a command!")
+    """Doc."""
     pass
 
 
 @cli.command()
 def envs():
-    click.echo(['- %s\n' % env for env in laim.envs()])
+    """Doc."""
+    envs = '\n'.join(['- %s' % env for env in laim.envs()])
+    click.echo('Running environments:\n' + '=' * 21 + '\n' + envs + '\n')
 
 
 @cli.command()
-@click.option('--env_name', prompt='Env name',
+@click.option('--name', prompt='Name',
               help='Give a name to your environment')
-@click.option('--source_type', prompt='Source type',
-              help='Choose between: ' + ' '.join(
-                  st for st in laim.SOURCE_TYPE))
-@click.option('--source_alias', prompt='Source alias',
-              help="If it's an image, type in the alias name of the image")
-def startenv(env_name, source_type, source_alias):
-    c = laim.startenv(
-        name=env_name,
-        source_type='image',
-        source_alias=source_alias,
-        profiles=['default'],
-        conf={},
-        ephemeral=False
-    )
-    click.echo(c)
+def start(name):
+    """Doc."""
+    try:
+        status_code, container = laim.startenv(
+            name=name,
+        )
+        click.echo("=" * 25 + "\n" + "Status: " + STATUSES.get(status_code))
+
+        # if status_code == STOPPED:
+        #     container.start()
+
+    except LaimEnvAlreadyExists:
+        if click.confirm("Environment already exists. Delete and continue?"):
+            laim.delete(name)
+
+
+@cli.command()
+@click.option('--name', prompt='Name',
+              help='Name of environment to delete')
+def delete(name):
+    """Doc."""
+    try:
+        laim.delete(name)
+        click.echo('Environment "{}"" deleted.'.format(name))
+    except LaimEnvDoesNotExist:
+        click.echo('Environment "{}" does not exist.'.format(name))
+    except LaimEnvNotStopped:
+        if click.confirm("Environment not stopped. Stop and try again?"):
+            laim.stop(name, wait=True)
+            laim.delete(name)
+
+
+@cli.command()
+@click.option('--name', prompt='Name',
+              help='Name of environment to activate')
+def activate(name):
+    """Doc."""
+    try:
+        click.echo('Activating "{}"...'.format(name))
+        laim.bash(name)
+        click.echo('Deactivating "{}"...'.format(name))
+    except LaimEnvDoesNotExist:
+        click.echo('Environment does not exist.')
